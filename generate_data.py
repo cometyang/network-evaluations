@@ -188,8 +188,12 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
     grayImages = np.zeros((img.shape[0],img.shape[1], np.shape(img_files_gray)[0]))
     labelImages = np.zeros((img.shape[0],img.shape[1], np.shape(img_files_gray)[0]))
     maskImages = np.zeros((img.shape[0],img.shape[1], np.shape(img_files_gray)[0]))
-    
-    for img_index in xrange(np.shape(img_files_gray)[0]):
+
+    # read the data
+    # in random order
+    read_order = np.random.permutation(np.shape(img_files_gray)[0])
+    for img_index in read_order:
+        #print img_files_gray[img_index]
         img = mahotas.imread(img_files_gray[img_index])
         img = normalizeImage(img) 
         grayImages[:,:,img_index] = img
