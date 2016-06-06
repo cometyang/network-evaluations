@@ -3,9 +3,10 @@
 # http://keras.io/getting-started/sequential-model-guide/
 from keras.models import Model, Sequential, model_from_json
 from keras.layers import Dense, Activation, Flatten, Input
-from keras.layers import Convolution2D, MaxPooling2D, UpSampling2D, merge, ZeroPadding2D
+from keras.layers import Convolution2D, MaxPooling2D, UpSampling2D, merge, ZeroPadding2D, Dropout
 from keras import backend as K
 from keras.optimizers import SGD
+from keras.regularizers import l2
 from generate_data import *
 import multiprocessing
 import sys
@@ -17,7 +18,7 @@ import theano
 import theano.tensor as T
 
 rng = np.random.RandomState(7)
-train_samples = 150 # under 210 mean its not using all images
+train_samples = 100 # under 210 mean its not using all images
 val_samples = 10
 learning_rate = 0.01
 
@@ -37,17 +38,26 @@ def unet_crossentropy_loss(y_true, y_pred):
     average_loss = T.mean(loss_vector)
     return average_loss
 
-def unet_block_down(input, nb_filter):
+def unet_block_down(input, nb_filter, doPooling=True, doDropout=False):
     # first convolutional block consisting of 2 conv layers plus activation, then maxpool.
     # All are valid area, not same
     conv1 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
-                             init="normal", border_mode="valid")(input)
+                             init="normal", border_mode="valid", W_regularizer=l2(1.0))(input)
     act1 = Activation("relu")(conv1)
     conv2 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
-                             init="normal", border_mode="valid")(act1)
+                             init="normal", border_mode="valid", W_regularizer=l2(1.0))(act1)
     act2 = Activation("relu")(conv2)
-    # now downsamplig with maxpool
-    pool1 = MaxPooling2D(pool_size=(2, 2), strides=(2, 2), border_mode="valid")(act2)
+    
+
+    if doDropout:
+        act2 = Dropout(0.5)(act2)
+    
+    if doPooling:
+        # now downsamplig with maxpool
+        pool1 = MaxPooling2D(pool_size=(2, 2), strides=(2, 2), border_mode="valid")(act2)
+    else:
+        pool1 = act2
+
     return (act2, pool1)
 
 def unet_block_up(input, nb_filter, down_block_out):
@@ -58,7 +68,7 @@ def unet_block_up(input, nb_filter, down_block_out):
     print "upsampled ", up_sampled._keras_shape
     # up-convolution
     conv_up = Convolution2D(nb_filter=nb_filter, nb_row=2, nb_col=2, subsample=(1,1),
-                             init="normal", border_mode="same")(up_sampled)
+                             init="normal", border_mode="same", W_regularizer=l2(1.0))(up_sampled)
     print "up-convolution ", conv_up._keras_shape
     # concatenation with cropped high res output
     # this is too large and needs to be cropped
@@ -74,11 +84,11 @@ def unet_block_up(input, nb_filter, down_block_out):
     # two 3x3 convolutions with ReLU
     # first one halves the feature channels
     conv1 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
-                             init="normal", border_mode="valid")(merged)
+                             init="normal", border_mode="valid", W_regularizer=l2(1.0))(merged)
     act1 = Activation("relu")(conv1)
     print "conv1 ", act1._keras_shape
     conv2 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
-                             init="normal", border_mode="valid")(act1)
+                             init="normal", border_mode="valid", W_regularizer=l2(1.0))(act1)
     act2 = Activation("relu")(conv2)
     print "conv2 ", act2._keras_shape
     
@@ -105,12 +115,12 @@ if doTrain:
     print "block3 ", block3_pool._keras_shape
 
     print "== BLOCK 4 =="
-    block4_act, block4_pool = unet_block_down(input=block3_pool, nb_filter=512)
+    block4_act, block4_pool = unet_block_down(input=block3_pool, nb_filter=512, doDropout=True)
     print "block4 ", block4_pool._keras_shape
 
     print "== BLOCK 5 =="
-    print "Pooled output is just for size check, not actually used from this block"
-    block5_act, block5_pool = unet_block_down(input=block4_pool, nb_filter=1024)
+    print "no pooling"
+    block5_act, block5_pool = unet_block_down(input=block4_pool, nb_filter=1024, doDropout=True, doPooling=False)
     print "block5 ", block5_pool._keras_shape
 
     print "=============="
