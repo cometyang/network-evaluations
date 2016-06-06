@@ -60,3 +60,14 @@ target/
 
 #Ipython Notebook
 .ipynb_checkpoints
+
+# Images
+*.png
+*.tif
+
+# saved networks 
+*.json
+*.h5
+
+# emacs backup
+*.*~
