@@ -23,8 +23,8 @@ learning_rate = 0.01
 
 doTrain = int(sys.argv[1])
 
-patchSize = 284 #140
-patchSize_out = 276 #132
+patchSize = 572 #140
+patchSize_out = 564 #132
 
 
 # need to define a custom loss, because all pre-implementations
@@ -104,11 +104,25 @@ if doTrain:
     block3_act, block3_pool = unet_block_down(input=block2_pool, nb_filter=256)
     print "block3 ", block3_pool._keras_shape
 
+    print "== BLOCK 4 =="
+    block4_act, block4_pool = unet_block_down(input=block3_pool, nb_filter=512)
+    print "block4 ", block4_pool._keras_shape
+
+    print "== BLOCK 5 =="
+    print "Pooled output is just for size check, not actually used from this block"
+    block5_act, block5_pool = unet_block_down(input=block4_pool, nb_filter=1024)
+    print "block5 ", block5_pool._keras_shape
+
     print "=============="
     print
 
+    print "== BLOCK 4 UP =="
+    block4_up = unet_block_up(input=block5_act, nb_filter=512, down_block_out=block4_act)
+    print "block4 up", block4_up._keras_shape
+    print
+
     print "== BLOCK 3 UP =="
-    block3_up = unet_block_up(input=block3_pool, nb_filter=256, down_block_out=block3_act)
+    block3_up = unet_block_up(input=block4_up, nb_filter=256, down_block_out=block3_act)
     print "block3 up", block3_up._keras_shape
     print
 
