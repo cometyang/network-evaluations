@@ -13,8 +13,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 rng = np.random.RandomState(7)
-train_samples = 500
-val_samples = 100
+train_samples = 50000
+val_samples = 10000
+
+learning_rate = 0.1
+patience = 2
 
 doTrain = int(sys.argv[1])
 
@@ -51,7 +54,7 @@ if doTrain:
     model.add(Dense(2, init='uniform'))
     model.add(Activation('softmax'))
     
-    sgd = SGD(lr=0.1, decay=0, momentum=0.0, nesterov=False)
+    sgd = SGD(lr=learning_rate, decay=0, momentum=0.0, nesterov=False)
     model.compile(loss='sparse_categorical_crossentropy', optimizer=sgd)
 
     data_val = generate_experiment_data_supervised(purpose='validate', nsamples=val_samples, patchSize=65, balanceRate=0.5, rng=rng)
@@ -66,8 +69,9 @@ if doTrain:
     futureData = pool.apply_async(stupid_map_wrapper, [[generate_experiment_data_supervised,'train', train_samples, 65, 0.5, rng]])
     
     best_val_loss_so_far = 100
-    
-    for epoch in xrange(1):
+    patience_counter = 0
+
+    for epoch in xrange(1000000000):
         print "Waiting for data."
         data = futureData.get()
         #data = generate_experiment_data_supervised(purpose='train', nsamples=1000, patchSize=65, balanceRate=0.5, rng=np.random)
@@ -81,6 +85,9 @@ if doTrain:
         
         model.fit(data_x, data_y, batch_size=100, nb_epoch=1)
         
+        print "current learning rate: ", model.optimizer.lr.get_value()
+        model.fit(data_x, data_y, batch_size=1, nb_epoch=1)
+
         validation_loss = model.evaluate(data_x_val, data_y_val, batch_size=100)
         print "validation loss ", validation_loss
         
@@ -94,6 +101,22 @@ if doTrain:
             json_string = model.to_json()
             open('simple_cnn_keras_best.json', 'w').write(json_string)
             model.save_weights('simple_cnn_keras_best_weights.h5', overwrite=True) 
+            patience_counter=0
+        else:
+            patience_counter +=1
+
+        # no progress anymore, need to decrease learning rate
+        if patience_counter == patience:
+            print "DECREASING LEARNING RATE"
+            print "before: ", learning_rate
+            learning_rate *= 0.1
+            print "now: ", learning_rate
+            model.optimizer.lr.set_value(learning_rate)
+            patience = 20
+        
+        # stop if not learning anymore
+        if learning_rate < 1e-7:
+            break
 
 else:
     model = model_from_json(open('simple_cnn_keras.json').read())
@@ -117,7 +140,7 @@ else:
             print rows
             print "time so far: ", time.clock()-start_time
             
-    mahotas.imsave('keras_prediction_cnn_12.png', np.uint8(prob_img*255))
+    mahotas.imsave('keras_prediction_cnn_13.png', np.uint8(prob_img*255))
     
     plt.imshow(prob_img)
     plt.show()
