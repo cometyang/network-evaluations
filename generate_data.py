@@ -165,7 +165,7 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
     start_time = time.time()
 
     pathPrefix = '/media/vkaynig/Data1/Cmor_paper_data/'
-    img_search_string_membraneImages = pathPrefix + 'labels/membranes_nonDilate/' + purpose + '/*.tif'
+    img_search_string_membraneImages = pathPrefix + 'labels/membranes/' + purpose + '/*.tif'
     img_search_string_backgroundMaskImages = pathPrefix + 'labels/background_nonDilate/' + purpose + '/*.tif'
 
     img_search_string_grayImages = pathPrefix + 'images/' + purpose + '/*.tif'
@@ -229,6 +229,10 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
             if random.random() < 0.5:
                     imgPatch = np.fliplr(imgPatch)
                     labelPatch = np.fliplr(labelPatch)
+
+            rotateInt = random.randint(0,3)
+            imgPatch = np.rot90(imgPatch, rotateInt)
+            labelPatch = np.rot90(labelPatch, rotateInt)
 
             whole_set_patches[counter,:] = imgPatch.flatten()
             whole_set_labels[counter] = np.int32(labelPatch.flatten() > 0)
