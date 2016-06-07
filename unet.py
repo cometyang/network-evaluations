@@ -4,6 +4,7 @@
 from keras.models import Model, Sequential, model_from_json
 from keras.layers import Dense, Activation, Flatten, Input
 from keras.layers import Convolution2D, MaxPooling2D, UpSampling2D, merge, ZeroPadding2D, Dropout, Lambda
+from keras.callbacks import EarlyStopping
 from keras import backend as K
 from keras.optimizers import SGD
 from keras.regularizers import l2
@@ -20,16 +21,18 @@ import theano.tensor as T
 rng = np.random.RandomState(7)
 train_samples = 20 # under 210 mean its not using all images
 val_samples = 10
-learning_rate = 0.01
+learning_rate = 0.1
 
 doTrain = int(sys.argv[1])
 
 patchSize = 572 #140
 patchSize_out = 388 #132
 
-weight_decay = 0.01
+weight_decay = 0.0
+patience = 2
 
-purpose = 'train'
+purpose = 'test'
+initialization = 'glorot_uniform'
 
 # need to define a custom loss, because all pre-implementations
 # seem to assume that scores over patch add up to one which
@@ -44,12 +47,10 @@ def unet_crossentropy_loss(y_true, y_pred):
 def unet_block_down(input, nb_filter, doPooling=True, doDropout=False):
     # first convolutional block consisting of 2 conv layers plus activation, then maxpool.
     # All are valid area, not same
-    conv1 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
-                             init="glorot_normal", border_mode="valid", W_regularizer=l2(weight_decay))(input)
-    act1 = Activation("relu")(conv1)
-    conv2 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
-                             init="glorot_normal", border_mode="valid", W_regularizer=l2(weight_decay))(act1)
-    act2 = Activation("relu")(conv2)
+    act1 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
+                             init=initialization, activation='relu',  border_mode="valid", W_regularizer=l2(weight_decay))(input)
+    act2 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
+                             init=initialization, activation='relu', border_mode="valid", W_regularizer=l2(weight_decay))(act1)
     
 
     if doDropout:
@@ -67,7 +68,7 @@ def unet_block_down(input, nb_filter, doPooling=True, doDropout=False):
 # input is a tensor of size (batchsize, channels, width, height)
 def crop_layer(x, cs):
     cropSize = cs
-    return x[:,:,2*cropSize:, 2*cropSize:]
+    return x[:,:,cropSize:-cropSize, cropSize:-cropSize]
 
 
 def unet_block_up(input, nb_filter, down_block_out):
@@ -78,7 +79,7 @@ def unet_block_up(input, nb_filter, down_block_out):
     print "upsampled ", up_sampled._keras_shape
     # up-convolution
     conv_up = Convolution2D(nb_filter=nb_filter, nb_row=2, nb_col=2, subsample=(1,1),
-                             init="glorot_normal", border_mode="same", W_regularizer=l2(weight_decay))(up_sampled)
+                             init=initialization, activation='relu', border_mode="same", W_regularizer=l2(weight_decay))(up_sampled)
     print "up-convolution ", conv_up._keras_shape
     # concatenation with cropped high res output
     # this is too large and needs to be cropped
@@ -98,13 +99,11 @@ def unet_block_up(input, nb_filter, down_block_out):
     print "merged ", merged._keras_shape
     # two 3x3 convolutions with ReLU
     # first one halves the feature channels
-    conv1 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
-                             init="glorot_normal", border_mode="valid", W_regularizer=l2(weight_decay))(merged)
-    act1 = Activation("relu")(conv1)
+    act1 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
+                             init=initialization, activation='relu', border_mode="valid", W_regularizer=l2(weight_decay))(merged)
     print "conv1 ", act1._keras_shape
-    conv2 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
-                             init="glorot_normal", border_mode="valid", W_regularizer=l2(weight_decay))(act1)
-    act2 = Activation("relu")(conv2)
+    act2 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
+                             init=initialization, activation='relu', border_mode="valid", W_regularizer=l2(weight_decay))(act1)
     print "conv2 ", act2._keras_shape
     
     return act2
@@ -119,6 +118,7 @@ if doTrain:
     input = Input(shape=(1, patchSize, patchSize))
     print "input ", input._keras_shape
     block1_act, block1_pool = unet_block_down(input=input, nb_filter=64)
+    print "block1 act ", block1_act._keras_shape
     print "block1 ", block1_pool._keras_shape
 
     print "== BLOCK 2 =="
@@ -161,13 +161,13 @@ if doTrain:
     print "block1 up", block1_up._keras_shape
 
     print "== 1x1 convolution =="
-    conv_end = Convolution2D(nb_filter=1, nb_row=1, nb_col=1, subsample=(1,1),
-                             init="glorot_normal", border_mode="valid")(block1_up)
-    output = Activation("sigmoid")(conv_end)
+    output = Convolution2D(nb_filter=1, nb_row=1, nb_col=1, subsample=(1,1),
+                             init=initialization, activation='sigmoid', border_mode="valid")(block1_up)
     print "output ", output._keras_shape
     output_flat = Flatten()(output)
     print "output flat ", output_flat._keras_shape
     model = Model(input=input, output=output_flat)
+    #model = Model(input=input, output=block1_act)
     sgd = SGD(lr=learning_rate, decay=0, momentum=0.0, nesterov=False)
     #model.compile(loss='mse', optimizer=sgd)
     model.compile(loss=unet_crossentropy_loss, optimizer=sgd)
@@ -184,6 +184,7 @@ if doTrain:
     
     best_val_loss_so_far = 1000
     
+    patience_counter = 0
     for epoch in xrange(1000000):
         print "Waiting for data."
         data = futureData.get()
@@ -195,6 +196,7 @@ if doTrain:
         print "got new data"
         futureData = pool.apply_async(stupid_map_wrapper, [[generate_experiment_data_patch_prediction,purpose, train_samples, patchSize, patchSize_out]])
  
+        print "current learning rate: ", model.optimizer.lr.get_value()
         model.fit(data_x, data_y, batch_size=1, nb_epoch=1)
         
         validation_loss = model.evaluate(data_x_val, data_y_val, batch_size=1)
@@ -210,6 +212,22 @@ if doTrain:
             json_string = model.to_json()
             open('unet_keras_best.json', 'w').write(json_string)
             model.save_weights('unet_keras_best_weights.h5', overwrite=True) 
+            patience_counter=0
+        else:
+            patience_counter +=1
+
+        # no progress anymore, need to decrease learning rate
+        if patience_counter == patience:
+            print "DECREASING LEARNING RATE"
+            print "before: ", learning_rate
+            learning_rate *= 0.1
+            print "now: ", learning_rate
+            model.optimizer.lr.set_value(learning_rate)
+            patience = 20
+        
+        # stop if not learning anymore
+        if learning_rate < 1e-7:
+            break
 
 else:
     start_time = time.clock()
@@ -231,7 +249,7 @@ else:
     # plt.imshow(1-probs); plt.show()
 
     # pad the image
-    padding = patchSize - patchSize_out
+    padding = int(np.ceil((patchSize - patchSize_out)/2.0))
     paddedImage = np.pad(image, padding, mode='reflect')
 
     probImage = np.zeros(image.shape)
@@ -240,33 +258,37 @@ else:
     col = 0
     patch = paddedImage[row:row+patchSize,col:col+patchSize]
     data = np.reshape(patch, (1,1,patchSize,patchSize))
-    probs = model.predict(x=data, batch_size = 1)
+    probs = model.predict(x=data, batch_size=1)
+    print probs.shape
+    probs = np.reshape(probs, (patchSize_out,patchSize_out))
+    print "min max output ", np.min(probs), np.max(probs)
+    plt.imshow(probs); plt.show()
 
-    init_time = time.clock()
-    print "Initialization took: ", init_time - start_time
+    # init_time = time.clock()
+    # print "Initialization took: ", init_time - start_time
 
-    for row in xrange(0,image.shape[0],patchSize_out):
-        for col in xrange(0,image.shape[1],patchSize_out):
-            print (row,col)
-            patch = paddedImage[row:row+patchSize,col:col+patchSize]
-            data = np.reshape(patch, (1,1,patchSize,patchSize))
-            probs = model.predict(x=data, batch_size = 1)
-            probs = np.reshape(probs, (patchSize_out,patchSize_out))
+    # for row in xrange(0,image.shape[0],patchSize_out):
+    #     for col in xrange(0,image.shape[1],patchSize_out):
+    #         print (row,col)
+    #         patch = paddedImage[row:row+patchSize,col:col+patchSize]
+    #         data = np.reshape(patch, (1,1,patchSize,patchSize))
+    #         probs = model.predict(x=data, batch_size = 1)
+    #         probs = np.reshape(probs, (patchSize_out,patchSize_out))
 
-            row_end = patchSize_out
-            if row+patchSize_out > probImage.shape[0]:
-                row_end = probImage.shape[0]-row
-            col_end = patchSize_out
-            if col+patchSize_out > probImage.shape[1]:
-                col_end = probImage.shape[1]-col
+    #         row_end = patchSize_out
+    #         if row+patchSize_out > probImage.shape[0]:
+    #             row_end = probImage.shape[0]-row
+    #         col_end = patchSize_out
+    #         if col+patchSize_out > probImage.shape[1]:
+    #             col_end = probImage.shape[1]-col
 
-            probImage[row:row+row_end,col:col+col_end] = probs[:row_end,:col_end]
+    #         probImage[row:row+row_end,col:col+col_end] = probs[:row_end,:col_end]
 
-    end_time = time.clock()
-    print "Prediction took: ", end_time - init_time
-    print "Speed: ", 1./(end_time - init_time)
-    print "Time total: ", end_time-start_time
+    # end_time = time.clock()
+    # print "Prediction took: ", end_time - init_time
+    # print "Speed: ", 1./(end_time - init_time)
+    # print "Time total: ", end_time-start_time
 
 
-    print "min max output ", np.min(probImage), np.max(probImage)
-    plt.imshow(probImage); plt.show()
+    # print "min max output ", np.min(probImage), np.max(probImage)
+    # plt.imshow(probImage); plt.show()
