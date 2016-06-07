@@ -6,6 +6,7 @@ from keras.layers import Dense, Activation, Flatten
 from keras.layers import Convolution2D, MaxPooling2D
 from keras.optimizers import SGD
 from keras.initializations import uniform
+from keras import backend as K
 from generate_data import *
 import multiprocessing
 import sys
@@ -20,6 +21,12 @@ learning_rate = 0.1
 patience = 2
 
 doTrain = int(sys.argv[1])
+filename = 'thin_membranes'
+
+# cluster seems to have outdated version of keras
+def categorical_crossentropy_int(y_true, y_pred):
+    return K.mean(K.categorical_crossentropy(y_pred, K.cast(y_true.flatten(), dtype='int32')), axis=-1)
+
 
 if doTrain:
     model = Sequential()
@@ -55,7 +62,8 @@ if doTrain:
     model.add(Activation('softmax'))
     
     sgd = SGD(lr=learning_rate, decay=0, momentum=0.0, nesterov=False)
-    model.compile(loss='sparse_categorical_crossentropy', optimizer=sgd)
+    #model.compile(loss='sparse_categorical_crossentropy', optimizer=sgd)
+    model.compile(loss=categorical_crossentropy_int, optimizer=sgd)
 
     data_val = generate_experiment_data_supervised(purpose='validate', nsamples=val_samples, patchSize=65, balanceRate=0.5, rng=rng)
     
@@ -92,15 +100,15 @@ if doTrain:
         print "validation loss ", validation_loss
         
         json_string = model.to_json()
-        open('simple_cnn_keras.json', 'w').write(json_string)
-        model.save_weights('simple_cnn_keras_weights.h5', overwrite=True) 
+        open(filename+'_simple_cnn.json', 'w').write(json_string)
+        model.save_weights(filename+'_simple_cnn_weights.h5', overwrite=True) 
         
         if validation_loss < best_val_loss_so_far:
             best_val_loss_so_far = validation_loss
             print "NEW BEST MODEL"
             json_string = model.to_json()
-            open('simple_cnn_keras_best.json', 'w').write(json_string)
-            model.save_weights('simple_cnn_keras_best_weights.h5', overwrite=True) 
+            open(filename+'_simple_cnn_best.json', 'w').write(json_string)
+            model.save_weights(filename+'simple_cnn_best_weights.h5', overwrite=True) 
             patience_counter=0
         else:
             patience_counter +=1
