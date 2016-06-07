@@ -86,7 +86,7 @@ if doTrain:
         model.fit(data_x, data_y, batch_size=100, nb_epoch=1)
         
         print "current learning rate: ", model.optimizer.lr.get_value()
-        model.fit(data_x, data_y, batch_size=1, nb_epoch=1)
+        model.fit(data_x, data_y, batch_size=100, nb_epoch=1)
 
         validation_loss = model.evaluate(data_x_val, data_y_val, batch_size=100)
         print "validation loss ", validation_loss
@@ -126,7 +126,7 @@ else:
     model.compile(loss='sparse_categorical_crossentropy', optimizer=sgd)
     
     image = mahotas.imread('ac3_input_0141.tif')
-    image = image[:512,:512]
+    image = image[:256,:256]
     prob_img = np.zeros(image.shape)
     
     start_time = time.clock()
@@ -140,7 +140,7 @@ else:
             print rows
             print "time so far: ", time.clock()-start_time
             
-    mahotas.imsave('keras_prediction_cnn_13.png', np.uint8(prob_img*255))
+    mahotas.imsave('keras_prediction_cnn_16.png', np.uint8(prob_img*255))
     
     plt.imshow(prob_img)
     plt.show()
