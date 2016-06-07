@@ -19,7 +19,7 @@ import theano
 import theano.tensor as T
 
 rng = np.random.RandomState(7)
-train_samples = 20 # under 210 mean its not using all images
+train_samples = 20 
 val_samples = 10
 learning_rate = 0.1
 
@@ -185,7 +185,7 @@ if doTrain:
     best_val_loss_so_far = 1000
     
     patience_counter = 0
-    for epoch in xrange(1000000):
+    for epoch in xrange(1000000000):
         print "Waiting for data."
         data = futureData.get()
         
