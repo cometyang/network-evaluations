@@ -28,11 +28,12 @@ doTrain = int(sys.argv[1])
 patchSize = 572 #140
 patchSize_out = 388 #132
 
-weight_decay = 0.0
+weight_decay = 1.0
 patience = 2
 
 purpose = 'test'
 initialization = 'glorot_uniform'
+filename = 'unet_weight_decay_1'
 
 # need to define a custom loss, because all pre-implementations
 # seem to assume that scores over patch add up to one which
@@ -203,15 +204,15 @@ if doTrain:
         print "validation loss ", validation_loss
         
         json_string = model.to_json()
-        open('unet_keras.json', 'w').write(json_string)
-        model.save_weights('unet_keras_weights.h5', overwrite=True) 
+        open(filename+'.json', 'w').write(json_string)
+        model.save_weights(filename+'_weights.h5', overwrite=True) 
         
         if validation_loss < best_val_loss_so_far:
             best_val_loss_so_far = validation_loss
             print "NEW BEST MODEL"
             json_string = model.to_json()
-            open('unet_keras_best.json', 'w').write(json_string)
-            model.save_weights('unet_keras_best_weights.h5', overwrite=True) 
+            open(filename+'_best.json', 'w').write(json_string)
+            model.save_weights(filename+'_best_weights.h5', overwrite=True) 
             patience_counter=0
         else:
             patience_counter +=1
