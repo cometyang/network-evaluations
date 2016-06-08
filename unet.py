@@ -224,7 +224,8 @@ if doTrain:
             learning_rate *= 0.1
             print "now: ", learning_rate
             model.optimizer.lr.set_value(learning_rate)
-            patience = 20
+            patience = 40
+            patience_counter = 0
         
         # stop if not learning anymore
         if learning_rate < 1e-7:

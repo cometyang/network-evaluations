@@ -25,8 +25,8 @@ def generate_experiment_data_supervised(purpose='train', nsamples=1000, patchSiz
 
     #pathPrefix = '/media/vkaynig/Data1/Cmor_paper_data/'
     pathPrefix = '/n/pfister_lab/vkaynig/'
-    img_search_string_membraneImages = pathPrefix + 'labels/membranes_nonDilate/' + purpose + '/*.tif'
-    img_search_string_backgroundMaskImages = pathPrefix + 'labels/background_nonDilate/' + purpose + '/*.tif'
+    img_search_string_membraneImages = pathPrefix + 'labels/membranes/' + purpose + '/*.tif'
+    img_search_string_backgroundMaskImages = pathPrefix + 'labels/background/' + purpose + '/*.tif'
 	
     img_search_string_grayImages = pathPrefix + 'images/' + purpose + '/*.tif'
 	
