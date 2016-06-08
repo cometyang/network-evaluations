@@ -23,10 +23,17 @@ def generate_experiment_data_supervised(purpose='train', nsamples=1000, patchSiz
     # quick dirty fix
     #random.seed(rng.rand())
 
+<<<<<<< HEAD
     #pathPrefix = '/media/vkaynig/Data1/Cmor_paper_data/'
     pathPrefix = '/n/pfister_lab/vkaynig/'
     img_search_string_membraneImages = pathPrefix + 'labels/membranes/' + purpose + '/*.tif'
     img_search_string_backgroundMaskImages = pathPrefix + 'labels/background/' + purpose + '/*.tif'
+=======
+    pathPrefix = '/media/vkaynig/Data1/Cmor_paper_data/'
+    #pathPrefix = '/n/pfister_lab/vkaynig/'
+    img_search_string_membraneImages = pathPrefix + 'labels/membranes_nonDilate/' + purpose + '/*.tif'
+    img_search_string_backgroundMaskImages = pathPrefix + 'labels/background_nonDilate/' + purpose + '/*.tif'
+>>>>>>> d487df725f2e135e439bfe443dc3c8f1a19188b6
 	
     img_search_string_grayImages = pathPrefix + 'images/' + purpose + '/*.tif'
 	
@@ -165,8 +172,8 @@ def stupid_map_wrapper(parameters):
 def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, patchSize=29, outPatchSize=1):
     start_time = time.time()
 
-    #pathPrefix = '/media/vkaynig/Data1/Cmor_paper_data/'
-    pathPrefix = '/n/pfister_lab/vkaynig/'
+    pathPrefix = '/media/vkaynig/Data1/Cmor_paper_data/'
+    #pathPrefix = '/n/pfister_lab/vkaynig/'
     img_search_string_membraneImages = pathPrefix + 'labels/membranes/' + purpose + '/*.tif'
     img_search_string_backgroundMaskImages = pathPrefix + 'labels/background_nonDilate/' + purpose + '/*.tif'
 
