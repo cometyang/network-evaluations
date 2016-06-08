@@ -14,19 +14,14 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 rng = np.random.RandomState(7)
-train_samples = 50000
-val_samples = 10000
+train_samples = 500
+val_samples = 100
 
 learning_rate = 0.1
 patience = 2
 
 doTrain = int(sys.argv[1])
 filename = 'thin_membranes'
-
-# cluster seems to have outdated version of keras
-def categorical_crossentropy_int(y_true, y_pred):
-    return K.mean(K.categorical_crossentropy(y_pred, K.cast(y_true.flatten(), dtype='int32')), axis=-1)
-
 
 if doTrain:
     model = Sequential()
@@ -62,8 +57,7 @@ if doTrain:
     model.add(Activation('softmax'))
     
     sgd = SGD(lr=learning_rate, decay=0, momentum=0.0, nesterov=False)
-    #model.compile(loss='sparse_categorical_crossentropy', optimizer=sgd)
-    model.compile(loss=categorical_crossentropy_int, optimizer=sgd)
+    model.compile(loss='sparse_categorical_crossentropy', optimizer=sgd)
 
     data_val = generate_experiment_data_supervised(purpose='validate', nsamples=val_samples, patchSize=65, balanceRate=0.5, rng=rng)
     
@@ -120,7 +114,8 @@ if doTrain:
             learning_rate *= 0.1
             print "now: ", learning_rate
             model.optimizer.lr.set_value(learning_rate)
-            patience = 20
+            patience = 40
+            patience_counter = 0
         
         # stop if not learning anymore
         if learning_rate < 1e-7:
