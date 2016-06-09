@@ -235,70 +235,84 @@ if doTrain:
 
 else:
     start_time = time.clock()
-    model = model_from_json(open('unet_sampled.json').read())
-    model.load_weights('unet_sampled_weights.h5')
-    model_name = 'unet_sampled'
-    
-    sgd = SGD(lr=0.01, decay=0, momentum=0.0, nesterov=False)
-    model.compile(loss='categorical_crossentropy', optimizer=sgd)
 
+    network_file_path = 'to_evaluate/'
+    file_search_string = network_file_path + '*_best.json'
+    files = sorted( glob.glob( file_search_string ) )
     pathPrefix = '/media/vkaynig/Data1/all_data/testing/AC4_small/'
-    img_search_string = pathPrefix + 'gray_images/*.tif'
-    img_files = sorted( glob.glob( img_search_string ) )
-	
-    for img_index in xrange(np.shape(img_files)[0]):
-        print img_files[img_index]
-        image = mahotas.imread(img_files[img_index])
-        image = normalizeImage(image) 
-        image = image - 0.5
 
-        probImage = np.zeros(image.shape)
-        # count compilation time to init
-        row = 0
-        col = 0
-        patch = image[row:row+patchSize,col:col+patchSize]
-        data = np.reshape(patch, (1,1,patchSize,patchSize))
-        probs = model.predict(x=data, batch_size=1)
+    for file_index in xrange(np.shape(files)[0]):
+        print files[file_index]
+        model = model_from_json(open(files[file_index]).read())
+        weight_file = ('.').join(files[file_index].split('.')[:-1])
+        model.load_weights(weight_file+'_weights.h5')
+        model_name = os.path.splitext(os.path.basename(files[file_index]))[0]
         
-        init_time = time.clock()
-        #print "Initialization took: ", init_time - start_time
+        # create directory
+        if not os.path.exists(pathPrefix+'boundaryProbabilities/'+model_name):
+            os.makedirs(pathPrefix+'boundaryProbabilities/'+model_name)
+
+        sgd = SGD(lr=0.01, decay=0, momentum=0.0, nesterov=False)
+        model.compile(loss='categorical_crossentropy', optimizer=sgd)
         
-        image_orig = image.copy()
-        for rotation in range(1):
-            image = np.rot90(image_orig, rotation)
-            # pad the image
-            padding_ul = int(np.ceil((patchSize - patchSize_out)/2.0))
-            # need large padding for lower right corner
-            paddedImage = np.pad(image, patchSize, mode='reflect')
-            needed_ul_padding = patchSize - padding_ul
-            paddedImage = paddedImage[needed_ul_padding:, needed_ul_padding:]
+        img_search_string = pathPrefix + 'gray_images/*.tif'
+        img_files = sorted( glob.glob( img_search_string ) )
+        
+        for img_index in xrange(np.shape(img_files)[0]):
+            print img_files[img_index]
+            image = mahotas.imread(img_files[img_index])
+            image = normalizeImage(image) 
+            image = image - 0.5
             
-            probImage_tmp = np.zeros(image.shape)
-            for row in xrange(0,image.shape[0],patchSize_out):
-                for col in xrange(0,image.shape[1],patchSize_out):
-                    patch = paddedImage[row:row+patchSize,col:col+patchSize]
-                    data = np.reshape(patch, (1,1,patchSize,patchSize))
-                    probs = 1-model.predict(x=data, batch_size = 1)
-                    probs = np.reshape(probs, (patchSize_out,patchSize_out))
-                    
-                    row_end = patchSize_out
-                    if row+patchSize_out > probImage.shape[0]:
-                        row_end = probImage.shape[0]-row
-                    col_end = patchSize_out
-                    if col+patchSize_out > probImage.shape[1]:
-                        col_end = probImage.shape[1]-col
+            probImage = np.zeros(image.shape)
+            # count compilation time to init
+            row = 0
+            col = 0
+            patch = image[row:row+patchSize,col:col+patchSize]
+            data = np.reshape(patch, (1,1,patchSize,patchSize))
+            probs = model.predict(x=data, batch_size=1)
+            
+            init_time = time.clock()
+            #print "Initialization took: ", init_time - start_time
+            
+            image_orig = image.copy()
+            for rotation in range(1):
+                image = np.rot90(image_orig, rotation)
+                # pad the image
+                padding_ul = int(np.ceil((patchSize - patchSize_out)/2.0))
+                # need large padding for lower right corner
+                paddedImage = np.pad(image, patchSize, mode='reflect')
+                needed_ul_padding = patchSize - padding_ul
+                paddedImage = paddedImage[needed_ul_padding:, needed_ul_padding:]
+                
+                probImage_tmp = np.zeros(image.shape)
+                for row in xrange(0,image.shape[0],patchSize_out):
+                    for col in xrange(0,image.shape[1],patchSize_out):
+                        patch = paddedImage[row:row+patchSize,col:col+patchSize]
+                        data = np.reshape(patch, (1,1,patchSize,patchSize))
+                        probs = 1-model.predict(x=data, batch_size = 1)
+                        probs = np.reshape(probs, (patchSize_out,patchSize_out))
                         
-                    probImage_tmp[row:row+row_end,col:col+col_end] = probs[:row_end,:col_end]
-            probImage += np.rot90(probImage_tmp, 4-rotation)
-
-        probImage = probImage / 1.0
-        mahotas.imsave(pathPrefix+'boundaryProbabilities/'+model_name+'/'+str(img_index).zfill(4)+'.tif', np.uint8(probImage*255))
-
-    end_time = time.clock()
-    print "Prediction took: ", end_time - init_time
-    print "Speed: ", 1./(end_time - init_time)
-    print "Time total: ", end_time-start_time
-
-
-    print "min max output ", np.min(probImage), np.max(probImage)
+                        row_end = patchSize_out
+                        if row+patchSize_out > probImage.shape[0]:
+                            row_end = probImage.shape[0]-row
+                        col_end = patchSize_out
+                        if col+patchSize_out > probImage.shape[1]:
+                            col_end = probImage.shape[1]-col
+                            
+                        probImage_tmp[row:row+row_end,col:col+col_end] = probs[:row_end,:col_end]
+                probImage += np.rot90(probImage_tmp, 4-rotation)
+                
+            probImage = probImage / 1.0
+            
+            print pathPrefix+'boundaryProbabilities/'+model_name+'/'+str(img_index).zfill(4)+'.tif'
+            mahotas.imsave(pathPrefix+'boundaryProbabilities/'+model_name+'/'+str(img_index).zfill(4)+'.tif', np.uint8(probImage*255))
+            
+            end_time = time.clock()
+            print "Prediction took: ", end_time - init_time
+            print "Speed: ", 1./(end_time - init_time)
+            print "Time total: ", end_time-start_time
+            
+            
+            print "min max output ", np.min(probImage), np.max(probImage)
 
