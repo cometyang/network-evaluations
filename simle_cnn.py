@@ -21,49 +21,51 @@ learning_rate = 0.1
 patience = 2
 
 doTrain = int(sys.argv[1])
-filename = 'thin_membranes'
+filename = 'thick_membranes'
 
 if doTrain:
     model = Sequential()
     # input: 100x100 images with 3 channels -> (3, 100, 100) tensors.
     # this applies 32 convolution filters of size 3x3 each.
     # layer 1
-    model.add(Convolution2D(48, 5, 5, border_mode='valid', input_shape=(1, 65, 65), init='uniform'))
+    model.add(Convolution2D(48, 5, 5, border_mode='valid', activation='relu', input_shape=(1, 65, 65), init='uniform'))
     W = model.layers[-1].get_weights()
     #model.layers[-1].set_weights([W[0]/2.0, W[1]])
-    model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2, 2)))
     
     # layer 2
-    model.add(Convolution2D(48, 5, 5, border_mode='valid', init='uniform'))
+    model.add(Convolution2D(48, 5, 5, border_mode='valid', activation='relu', init='uniform'))
     #W = model.layers[-1].get_weights()
     #model.layers[-1].set_weights([W[0]/2.0, W[1]])
-    model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2, 2)))
     
     # layer 3
-    model.add(Convolution2D(48, 5, 5, border_mode='valid', init='uniform'))
+    model.add(Convolution2D(48, 5, 5, border_mode='valid', activation='relu', init='uniform'))
     #W = model.layers[-1].get_weights()
     #model.layers[-1].set_weights([W[0]/2.0, W[1]])
-    model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Flatten())
     
     # fc layer 1
-    model.add(Dense(200, init='uniform'))
-    model.add(Activation('relu'))
+    model.add(Dense(200, activation='relu', init='uniform'))
     # fc layer 2 to two classes
-    model.add(Dense(2, init='uniform'))
-    model.add(Activation('softmax'))
+    model.add(Dense(2, init='uniform', activation='softmax'))
     
     sgd = SGD(lr=learning_rate, decay=0, momentum=0.0, nesterov=False)
+<<<<<<< HEAD
+    model.compile(loss='categorical_crossentropy', optimizer=sgd)
+    #model.compile(loss=categorical_crossentropy_int, optimizer=sgd)
+=======
     model.compile(loss='sparse_categorical_crossentropy', optimizer=sgd)
+>>>>>>> d487df725f2e135e439bfe443dc3c8f1a19188b6
 
     data_val = generate_experiment_data_supervised(purpose='validate', nsamples=val_samples, patchSize=65, balanceRate=0.5, rng=rng)
     
     data_x_val = data_val[0].astype(np.float32)
     data_x_val = np.reshape(data_x_val, [-1, 1, 65, 65])
-    data_y_val = data_val[1].astype(np.float32)
+    data_y_inds = data_val[1].astype(np.int64)
+    data_y_val = np.zeros((data_y_inds.shape[0],2))
+    data_y_val[np.arange(data_y_inds.shape[0]),data_y_inds] = 1
     
     # start pool for data
     print "Starting worker."
@@ -80,8 +82,11 @@ if doTrain:
         
         data_x = data[0].astype(np.float32)
         data_x = np.reshape(data_x, [-1, 1, 65, 65])
-        data_y = data[1].astype(np.float32)
-        
+        # need one hot encoding for keras
+        data_y_inds = data[1].astype(np.int64)
+        data_y = np.zeros((data_y_inds.shape[0],2))
+        data_y[np.arange(data_y_inds.shape[0]),data_y_inds] = 1
+
         print "got new data"
         futureData = pool.apply_async(stupid_map_wrapper, [[generate_experiment_data_supervised, 'train', train_samples, 65, 0.5, rng]])
         

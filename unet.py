@@ -28,12 +28,14 @@ doTrain = int(sys.argv[1])
 patchSize = 572 #140
 patchSize_out = 388 #132
 
-weight_decay = 1.0
+weight_decay = 0.0
+weight_class_1 = 2.
+
 patience = 2
 
 purpose = 'test'
 initialization = 'glorot_uniform'
-filename = 'unet_weight_decay_1'
+filename = 'unet_weighted_class_2'
 
 # need to define a custom loss, because all pre-implementations
 # seem to assume that scores over patch add up to one which
@@ -41,7 +43,7 @@ filename = 'unet_weight_decay_1'
 def unet_crossentropy_loss(y_true, y_pred):
     epsilon = 1.0e-4
     y_pred_clipped = T.clip(y_pred, epsilon, 1.0-epsilon)
-    loss_vector = -T.mean(y_true * T.log(y_pred_clipped) + (1-y_true) * T.log(1-y_pred_clipped), axis=1)
+    loss_vector = -T.mean(weight_class_1*y_true * T.log(y_pred_clipped) + (1-y_true) * T.log(1-y_pred_clipped), axis=1)
     average_loss = T.mean(loss_vector)
     return average_loss
 
@@ -224,7 +226,8 @@ if doTrain:
             learning_rate *= 0.1
             print "now: ", learning_rate
             model.optimizer.lr.set_value(learning_rate)
-            patience = 20
+            patience = 40
+            patience_counter = 0
         
         # stop if not learning anymore
         if learning_rate < 1e-7:
