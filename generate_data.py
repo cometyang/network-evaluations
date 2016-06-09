@@ -1,3 +1,4 @@
+import os
 import skimage.transform
 import time
 import glob
@@ -6,6 +7,30 @@ import mahotas
 import random
 import matplotlib
 import matplotlib.pyplot as plt
+import scipy
+import scipy.ndimage
+
+
+def deform_images(image1, image2):
+    displacement_x = np.random.normal(size=image1.shape, scale=10)
+    displacement_y = np.random.normal(size=image1.shape, scale=10)
+    
+    # smooth over image
+    coords_x, coords_y = np.meshgrid(np.arange(0,image1.shape[0]), np.arange(0,image1.shape[1]), indexing='ij')
+
+    displacement_x = coords_x.flatten() #+ scipy.ndimage.gaussian_filter(displacement_x, sigma=5).flatten()
+    displacement_y = coords_y.flatten() #+ scipy.ndimage.gaussian_filter(displacement_y, sigma=5).flatten()
+    
+    coordinates = np.vstack([displacement_x, displacement_y])
+    
+    # ndimage expects uint8 otherwise introduces artifacts. Don't ask me why, its stupid.
+    deformed1 = scipy.ndimage.map_coordinates(np.uint8(image1*255), coordinates, mode='reflect')
+    deformed2 = scipy.ndimage.map_coordinates(np.uint8(image2*255), coordinates, mode='reflect')
+
+    deformed1 = np.reshape(deformed1, image1.shape) / np.double(np.max(deformed1))
+    deformed2 = np.reshape(deformed2, image2.shape) / np.double(np.max(deformed2))
+    return (deformed1, deformed2)
+
 
 def normalizeImage(img, saturation_level=0.05): #was 0.005
 	sortedValues = np.sort( img.ravel())
@@ -20,20 +45,13 @@ def normalizeImage(img, saturation_level=0.05): #was 0.005
 def generate_experiment_data_supervised(purpose='train', nsamples=1000, patchSize=29, balanceRate=0.5, rng=np.random):
     start_time = time.time()
 
-    # quick dirty fix
-    #random.seed(rng.rand())
+    if os.path.exists('/media/vkaynig/Data1/Cmor_paper_data/'):
+        pathPrefix = '/media/vkaynig/Data1/Cmor_paper_data/'
+    else:
+        pathPrefix = '/n/pfister_lab/vkaynig/'
 
-<<<<<<< HEAD
-    #pathPrefix = '/media/vkaynig/Data1/Cmor_paper_data/'
-    pathPrefix = '/n/pfister_lab/vkaynig/'
-    img_search_string_membraneImages = pathPrefix + 'labels/membranes/' + purpose + '/*.tif'
-    img_search_string_backgroundMaskImages = pathPrefix + 'labels/background/' + purpose + '/*.tif'
-=======
-    pathPrefix = '/media/vkaynig/Data1/Cmor_paper_data/'
-    #pathPrefix = '/n/pfister_lab/vkaynig/'
     img_search_string_membraneImages = pathPrefix + 'labels/membranes_nonDilate/' + purpose + '/*.tif'
     img_search_string_backgroundMaskImages = pathPrefix + 'labels/background_nonDilate/' + purpose + '/*.tif'
->>>>>>> d487df725f2e135e439bfe443dc3c8f1a19188b6
 	
     img_search_string_grayImages = pathPrefix + 'images/' + purpose + '/*.tif'
 	
@@ -172,8 +190,11 @@ def stupid_map_wrapper(parameters):
 def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, patchSize=29, outPatchSize=1):
     start_time = time.time()
 
-    pathPrefix = '/media/vkaynig/Data1/Cmor_paper_data/'
-    #pathPrefix = '/n/pfister_lab/vkaynig/'
+    if os.path.exists('/media/vkaynig/Data1/Cmor_paper_data/'):
+        pathPrefix = '/media/vkaynig/Data1/Cmor_paper_data/'
+    else:
+        pathPrefix = '/n/pfister_lab/vkaynig/'
+
     img_search_string_membraneImages = pathPrefix + 'labels/membranes/' + purpose + '/*.tif'
     img_search_string_backgroundMaskImages = pathPrefix + 'labels/background_nonDilate/' + purpose + '/*.tif'
 
@@ -206,7 +227,7 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
         img = mahotas.imread(img_files_gray[img_index])
         img = normalizeImage(img) 
         grayImages[:,:,img_index] = img
-        label_img = mahotas.imread(img_files_label[img_index])        
+        label_img = mahotas.imread(img_files_label[img_index])/255.        
         labelImages[:,:,img_index] = label_img
         maskImages[:,:,img_index] = 1.0
             
@@ -231,9 +252,7 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
                          valid_indices[1][randmem])
 
             imgPatch = img[row:row+patchSize, col:col+patchSize]
-            offset_label_patch = int(np.ceil((patchSize - outPatchSize) / 2.0))
-            labelPatch = label_img[row+offset_label_patch:row+offset_label_patch+outPatchSize, 
-                                   col+offset_label_patch:col+offset_label_patch+outPatchSize]
+            labelPatch = label_img[row:row+patchSize, col:col+patchSize]
 
             if random.random() < 0.5:
                     imgPatch = np.fliplr(imgPatch)
@@ -243,10 +262,16 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
             imgPatch = np.rot90(imgPatch, rotateInt)
             labelPatch = np.rot90(labelPatch, rotateInt)
 
+            imgPatch, labelPatch = deform_images(imgPatch, labelPatch)
+
+            # crop labelPatch to potentially smaller output size
+            offset_label_patch = int(np.ceil((patchSize - outPatchSize) / 2.0))
+            labelPatch = labelPatch[offset_label_patch:offset_label_patch+outPatchSize, 
+                                    offset_label_patch:offset_label_patch+outPatchSize]
+
             whole_set_patches[counter,:] = imgPatch.flatten()
             whole_set_labels[counter] = np.int32(labelPatch.flatten() > 0)
             counter += 1
-
 
     #normalize data
     whole_data = np.float32(whole_set_patches)
@@ -274,5 +299,7 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
 
 if __name__=="__main__":
     #data_val = generate_experiment_data_supervised(purpose='validate', nsamples=10000, patchSize=65, balanceRate=0.5)
-    data = generate_experiment_data_patch_prediction(purpose='test', nsamples=100, patchSize=29, outPatchSize=29)
+    data = generate_experiment_data_patch_prediction(purpose='test', nsamples=1, patchSize=315, outPatchSize=215)
+    plt.imshow(np.reshape(data[0][0],(315,315))); plt.figure()
+    plt.imshow(np.reshape(data[1][0],(215,215))); plt.show()
 
