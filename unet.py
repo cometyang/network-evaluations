@@ -24,7 +24,7 @@ rng = np.random.RandomState(7)
 
 train_samples = 20 
 val_samples = 10
-learning_rate = 0.00001
+learning_rate = 0.01
 momentum = 0.0
 doTrain = int(sys.argv[1])
 
@@ -38,7 +38,7 @@ patience = 10000
 
 purpose = 'train'
 initialization = 'glorot_uniform'
-filename = 'unet_sampling_lr_0.00001'
+filename = 'unet_rand'
 print "filename: ", filename
 
 srng = RandomStreams(1234)
@@ -275,8 +275,7 @@ else:
     start_time = time.clock()
 
     network_file_path = 'to_evaluate/'
-    #file_search_string = network_file_path + '*_best.json'
-    file_search_string = network_file_path + 'unet_sampling_momentum_0.95_lr_0.01.json'
+    file_search_string = network_file_path + '*.json'
     files = sorted( glob.glob( file_search_string ) )
     pathPrefix = '/media/vkaynig/Data1/all_data/testing/AC4_small/'
 
