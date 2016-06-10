@@ -18,25 +18,30 @@ import matplotlib.pyplot as plt
 import theano
 import theano.tensor as T
 from evaluation import Rand_membrane_prob
+from theano.tensor.shared_randomstreams import RandomStreams
 
 rng = np.random.RandomState(7)
+
 train_samples = 20 
 val_samples = 10
-learning_rate = 0.1
-
+learning_rate = 0.00001
+momentum = 0.0
 doTrain = int(sys.argv[1])
 
 patchSize = 572 #140
 patchSize_out = 388 #132
 
 weight_decay = 0.0
-weight_class_1 = 2.
+weight_class_1 = 1.
 
-patience = 2
+patience = 10000
 
 purpose = 'train'
 initialization = 'glorot_uniform'
-filename = 'unet_test'
+filename = 'unet_sampling_lr_0.00001'
+print "filename: ", filename
+
+srng = RandomStreams(1234)
 
 # need to define a custom loss, because all pre-implementations
 # seem to assume that scores over patch add up to one which
@@ -45,6 +50,28 @@ def unet_crossentropy_loss(y_true, y_pred):
     epsilon = 1.0e-4
     y_pred_clipped = T.clip(y_pred, epsilon, 1.0-epsilon)
     loss_vector = -T.mean(weight_class_1*y_true * T.log(y_pred_clipped) + (1-y_true) * T.log(1-y_pred_clipped), axis=1)
+    average_loss = T.mean(loss_vector)
+    return average_loss
+
+def unet_crossentropy_loss_sampled(y_true, y_pred):
+    epsilon = 1.0e-4
+    y_pred_clipped = T.flatten(T.clip(y_pred, epsilon, 1.0-epsilon))
+    y_true = T.flatten(y_true)
+    # this seems to work
+    # it is super ugly though and I am sure there is a better way to do it
+    # but I am struggling with theano to cooperate
+    # filter the right indices
+    indPos = T.nonzero(y_true)[0] # no idea why this is a tuple
+    indNeg = T.nonzero(1-y_true)[0]
+    # shuffle
+    n = indPos.shape[0]
+    indPos = indPos[srng.permutation(n=n)]
+    n = indNeg.shape[0]
+    indNeg = indNeg[srng.permutation(n=n)]
+    # subset assuming each class has at least 100 samples present
+    indPos = indPos[:200]
+    indNeg = indNeg[:200]
+    loss_vector = -T.mean(T.log(y_pred_clipped[indPos])) - T.mean(T.log(1-y_pred_clipped[indNeg]))
     average_loss = T.mean(loss_vector)
     return average_loss
 
@@ -172,9 +199,9 @@ if doTrain:
     print "output flat ", output_flat._keras_shape
     model = Model(input=input, output=output_flat)
     #model = Model(input=input, output=block1_act)
-    sgd = SGD(lr=learning_rate, decay=0, momentum=0.0, nesterov=False)
+    sgd = SGD(lr=learning_rate, decay=0, momentum=momentum, nesterov=False)
     #model.compile(loss='mse', optimizer=sgd)
-    model.compile(loss=unet_crossentropy_loss, optimizer=sgd)
+    model.compile(loss=unet_crossentropy_loss_sampled, optimizer=sgd)
     data_val = generate_experiment_data_patch_prediction(purpose='validate', nsamples=val_samples, patchSize=patchSize, outPatchSize=patchSize_out)
    
     data_x_val = data_val[0].astype(np.float32)
