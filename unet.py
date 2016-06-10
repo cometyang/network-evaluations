@@ -23,8 +23,8 @@ rng = np.random.RandomState(7)
 
 train_samples = 20 
 val_samples = 10
-learning_rate = 0.1
-
+learning_rate = 0.00001
+momentum = 0.0
 doTrain = int(sys.argv[1])
 
 patchSize = 572 #140
@@ -33,11 +33,11 @@ patchSize_out = 388 #132
 weight_decay = 0.0
 weight_class_1 = 1.
 
-patience = 4
+patience = 10000
 
 purpose = 'train'
 initialization = 'glorot_uniform'
-filename = 'unet_sampled_200_mometum'
+filename = 'unet_sampling_lr_0.00001'
 print "filename: ", filename
 
 srng = RandomStreams(1234)
@@ -198,7 +198,7 @@ if doTrain:
     print "output flat ", output_flat._keras_shape
     model = Model(input=input, output=output_flat)
     #model = Model(input=input, output=block1_act)
-    sgd = SGD(lr=learning_rate, decay=0, momentum=0.99, nesterov=False)
+    sgd = SGD(lr=learning_rate, decay=0, momentum=momentum, nesterov=False)
     #model.compile(loss='mse', optimizer=sgd)
     model.compile(loss=unet_crossentropy_loss_sampled, optimizer=sgd)
     data_val = generate_experiment_data_patch_prediction(purpose='validate', nsamples=val_samples, patchSize=patchSize, outPatchSize=patchSize_out)
@@ -262,9 +262,9 @@ if doTrain:
 
 else:
     start_time = time.clock()
-    model = model_from_json(open('unet_sampled.json').read())
-    model.load_weights('unet_sampled_weights.h5')
-    model_name = 'unet_sampled'
+    model = model_from_json(open('unet_sampled_200_momentum.json').read())
+    model.load_weights('unet_sampled_200_momentumweights.h5')
+    model_name = 'unet_sampled_momentum'
     
     sgd = SGD(lr=0.01, decay=0, momentum=0.0, nesterov=False)
     model.compile(loss='categorical_crossentropy', optimizer=sgd)
