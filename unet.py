@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 # custom loss function
 import theano
 import theano.tensor as T
+from evaluation import Rand_membrane_prob
 
 rng = np.random.RandomState(7)
 train_samples = 20 
@@ -33,9 +34,9 @@ weight_class_1 = 2.
 
 patience = 2
 
-purpose = 'test'
+purpose = 'train'
 initialization = 'glorot_uniform'
-filename = 'unet_weighted_class_2'
+filename = 'unet_test'
 
 # need to define a custom loss, because all pre-implementations
 # seem to assume that scores over patch add up to one which
@@ -179,13 +180,14 @@ if doTrain:
     data_x_val = data_val[0].astype(np.float32)
     data_x_val = np.reshape(data_x_val, [-1, 1, patchSize, patchSize])
     data_y_val = data_val[1].astype(np.float32)
+    data_label_val = data_val[2]
 
     # start pool for data
     print "Starting worker."
     pool = multiprocessing.Pool(processes=1)
     futureData = pool.apply_async(stupid_map_wrapper, [[generate_experiment_data_patch_prediction,purpose, train_samples, patchSize, patchSize_out]])
     
-    best_val_loss_so_far = 1000
+    best_val_loss_so_far = 0
     
     patience_counter = 0
     for epoch in xrange(1000000000):
@@ -201,16 +203,25 @@ if doTrain:
  
         print "current learning rate: ", model.optimizer.lr.get_value()
         model.fit(data_x, data_y, batch_size=1, nb_epoch=1)
-        
-        validation_loss = model.evaluate(data_x_val, data_y_val, batch_size=1)
-        print "validation loss ", validation_loss
+
+
+        im_pred = 1-model.predict(x=data_x_val, batch_size = 1)
+
+        mean_val_rand = 0
+        for val_ind in xrange(val_samples):
+            im_pred_single = np.reshape(im_pred[val_ind,:], (patchSize_out,patchSize_out))
+            im_gt = np.reshape(data_label_val[val_ind], (patchSize_out,patchSize_out))
+            validation_rand = Rand_membrane_prob(im_pred_single, im_gt)
+            mean_val_rand += validation_rand
+        mean_val_rand /= np.double(val_samples)
+        print "validation RAND ", mean_val_rand
         
         json_string = model.to_json()
         open(filename+'.json', 'w').write(json_string)
         model.save_weights(filename+'_weights.h5', overwrite=True) 
         
-        if validation_loss < best_val_loss_so_far:
-            best_val_loss_so_far = validation_loss
+        if validation_rand > best_val_loss_so_far:
+            best_val_loss_so_far = validation_rand
             print "NEW BEST MODEL"
             json_string = model.to_json()
             open(filename+'_best.json', 'w').write(json_string)
@@ -237,7 +248,8 @@ else:
     start_time = time.clock()
 
     network_file_path = 'to_evaluate/'
-    file_search_string = network_file_path + '*_best.json'
+    #file_search_string = network_file_path + '*_best.json'
+    file_search_string = network_file_path + 'unet_sampling_momentum_0.95_lr_0.01.json'
     files = sorted( glob.glob( file_search_string ) )
     pathPrefix = '/media/vkaynig/Data1/all_data/testing/AC4_small/'
 
