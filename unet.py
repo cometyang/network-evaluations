@@ -233,8 +233,6 @@ if doTrain:
 
 
         im_pred = 1-model.predict(x=data_x_val, batch_size = 1)
-        im_pred_single = np.reshape(im_pred[0,:], (patchSize_out,patchSize_out))
-        mahotas.imsave(str(epoch).zfill(4)+'.png', np.uint8(im_pred_single*255))
 
         mean_val_rand = 0
         for val_ind in xrange(val_samples):

@@ -149,7 +149,7 @@ def Rand_membrane_prob(im_pred, im_gt):
         im_seg = im_pred>thresh
         # connected components
         seeds, nr_regions = mahotas.label(im_seg)
-        result = quick_Rand(im_gt, im_seg)        
+        result = quick_Rand(im_gt, seeds)        
         Rand_score.append(result)
 
     return np.max(Rand_score)
