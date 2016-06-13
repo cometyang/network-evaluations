@@ -25,7 +25,7 @@ rng = np.random.RandomState(7)
 train_samples = 20 
 val_samples = 10
 learning_rate = 0.01
-momentum = 0.0
+momentum = 0.95
 doTrain = int(sys.argv[1])
 
 patchSize = 572 #140
@@ -38,7 +38,7 @@ patience = 10000
 
 purpose = 'train'
 initialization = 'glorot_uniform'
-filename = 'unet_rand'
+filename = 'unet_rand_test'
 print "filename: ", filename
 
 srng = RandomStreams(1234)
@@ -217,7 +217,7 @@ if doTrain:
     best_val_loss_so_far = 0
     
     patience_counter = 0
-    for epoch in xrange(1000000000):
+    for epoch in xrange(5):
         print "Waiting for data."
         data = futureData.get()
         
@@ -233,6 +233,8 @@ if doTrain:
 
 
         im_pred = 1-model.predict(x=data_x_val, batch_size = 1)
+        im_pred_single = np.reshape(im_pred[0,:], (patchSize_out,patchSize_out))
+        mahotas.imsave(str(epoch).zfill(4)+'.png', np.uint8(im_pred_single*255))
 
         mean_val_rand = 0
         for val_ind in xrange(val_samples):
@@ -264,7 +266,7 @@ if doTrain:
             learning_rate *= 0.1
             print "now: ", learning_rate
             model.optimizer.lr.set_value(learning_rate)
-            patience = 40
+            patience = 10000
             patience_counter = 0
         
         # stop if not learning anymore
