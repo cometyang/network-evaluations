@@ -249,6 +249,7 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
         maskImages[:,:,img_index] = 1.0
         if purpose == 'validate':
             label_img = mahotas.imread(img_files_labels[img_index])        
+            label_img = np.double(label_img)
             labelImages[:,:,img_index] = label_img
             
     for img_index in xrange(np.shape(img_files_gray)[0]):
@@ -293,6 +294,9 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
                 imgPatch, membranePatch, labelPatch = deform_images(imgPatch, membranePatch, np.uint8(labelPatch))
             else:
                 imgPatch, membranePatch = deform_images(imgPatch, membranePatch)
+            
+            imgPatch = imgPatch / np.double(np.max(imgPatch))
+            membranePatch = membranePatch / np.double(np.max(membranePatch))
 
             # crop labelPatch to potentially smaller output size
             offset_small_patch = int(np.ceil((patchSize - outPatchSize) / 2.0))
@@ -335,8 +339,8 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
 
 if __name__=="__main__":
     #data_val = generate_experiment_data_supervised(purpose='validate', nsamples=10000, patchSize=65, balanceRate=0.5)
-    data = generate_experiment_data_patch_prediction(purpose='validate', nsamples=1, patchSize=315, outPatchSize=215)
-    plt.imshow(np.reshape(data[0][0],(315,315))); plt.figure()
-    plt.imshow(np.reshape(data[1][0],(215,215))); plt.figure()
-    plt.imshow(np.reshape(data[2][0],(215,215))); plt.show()
+    data = generate_experiment_data_patch_prediction(purpose='validate', nsamples=2, patchSize=315, outPatchSize=215)
+    # plt.imshow(np.reshape(data[0][0],(315,315))); plt.figure()
+    # plt.imshow(np.reshape(data[1][0],(215,215))); plt.figure()
+    # plt.imshow(np.reshape(data[2][0],(215,215))); plt.show()
 
