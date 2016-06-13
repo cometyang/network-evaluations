@@ -24,7 +24,7 @@ rng = np.random.RandomState(7)
 
 train_samples = 20 
 val_samples = 10
-learning_rate = 0.001
+learning_rate = 0.01
 momentum = 0.95
 doTrain = int(sys.argv[1])
 
@@ -34,15 +34,11 @@ patchSize_out = 388 #132
 weight_decay = 0.0
 weight_class_1 = 1.
 
-patience = 100
+patience = 10000
 
 purpose = 'train'
 initialization = 'glorot_uniform'
-<<<<<<< HEAD
-filename = 'unet_rand_cluster'
-=======
-filename = 'unet_rand'
->>>>>>> 332e5af28cb6356335cc4edb5c533bd67696f19b
+filename = 'unet_sampled_momentum_lr_0.01_long_run'
 print "filename: ", filename
 
 srng = RandomStreams(1234)
@@ -268,7 +264,7 @@ if doTrain:
             learning_rate *= 0.1
             print "now: ", learning_rate
             model.optimizer.lr.set_value(learning_rate)
-            patience = 100
+            patience = 10000
             patience_counter = 0
         
         # stop if not learning anymore
