@@ -9,6 +9,25 @@ import matplotlib
 import matplotlib.pyplot as plt
 import scipy
 import scipy.ndimage
+from scipy.ndimage.filters import maximum_filter
+
+# the idea is to grow the labels to cover the whole membrane
+# image and label should be [0,1]
+def adjust_imprecise_boundaries(image, label, number_iterations=5):
+    label = label.copy()
+    label_orig = label.copy()
+
+    for i in xrange(number_iterations):
+        # grow labels by one pixel
+        label = maximum_filter(label, 2)
+        # only keep pixels that are on dark membrane
+        non_valid_label = np.logical_and(label==1, image>0.7)
+        label[non_valid_label] = 0
+
+    # make sure original labels are preserved
+    label = np.logical_or(label==1, label_orig==1)
+
+    return label
 
 
 def deform_images(image1, image2, image3=None):
@@ -258,6 +277,9 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
         membrane_img = membraneImages[:,:,img_index]
         mask_img = maskImages[:,:,img_index]
 
+        if purpose=='train':
+            membrane_img = adjust_imprecise_boundaries(img, membrane_img, 10)
+
         #get rid of invalid image borders
         mask_img[:,-patchSize:] = 0
         mask_img[-patchSize:,:] = 0
@@ -339,8 +361,15 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
 
 if __name__=="__main__":
     #data_val = generate_experiment_data_supervised(purpose='validate', nsamples=10000, patchSize=65, balanceRate=0.5)
-    data = generate_experiment_data_patch_prediction(purpose='validate', nsamples=2, patchSize=315, outPatchSize=215)
+    #data = generate_experiment_data_patch_prediction(purpose='validate', nsamples=2, patchSize=315, outPatchSize=215)
     # plt.imshow(np.reshape(data[0][0],(315,315))); plt.figure()
     # plt.imshow(np.reshape(data[1][0],(215,215))); plt.figure()
     # plt.imshow(np.reshape(data[2][0],(215,215))); plt.show()
 
+    image = mahotas.imread('ac3_input_0141.tif')
+    image = normalizeImage(image)
+    label = mahotas.imread('ac3_labels_0141.tif') / 255.
+    test = adjust_imprecise_boundaries(image, label, 10)
+
+    plt.imshow(label+image); plt.show()
+    plt.imshow(test+image); plt.show()

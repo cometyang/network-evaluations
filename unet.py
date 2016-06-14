@@ -38,7 +38,7 @@ patience = 10
 
 purpose = 'train'
 initialization = 'glorot_uniform'
-filename = 'unet_rand_test'
+filename = 'unet_rand_dilated_membranes'
 print "filename: ", filename
 
 srng = RandomStreams(1234)
@@ -217,7 +217,7 @@ if doTrain:
     best_val_loss_so_far = 0
     
     patience_counter = 0
-    for epoch in xrange(5):
+    for epoch in xrange(10000000):
         print "Waiting for data."
         data = futureData.get()
         
