@@ -34,7 +34,7 @@ patchSize_out = 388 #132
 weight_decay = 0.0
 weight_class_1 = 1.
 
-patience = 10000
+patience = 10
 
 purpose = 'train'
 initialization = 'glorot_uniform'
@@ -247,8 +247,10 @@ if doTrain:
         open(filename+'.json', 'w').write(json_string)
         model.save_weights(filename+'_weights.h5', overwrite=True) 
         
-        if validation_rand > best_val_loss_so_far:
-            best_val_loss_so_far = validation_rand
+        print mean_val_rand, " > ",  best_val_loss_so_far
+        print mean_val_rand - best_val_loss_so_far
+        if mean_val_rand > best_val_loss_so_far:
+            best_val_loss_so_far = mean_val_rand
             print "NEW BEST MODEL"
             json_string = model.to_json()
             open(filename+'_best.json', 'w').write(json_string)
@@ -264,7 +266,7 @@ if doTrain:
             learning_rate *= 0.1
             print "now: ", learning_rate
             model.optimizer.lr.set_value(learning_rate)
-            patience = 10000
+            patience = 10
             patience_counter = 0
         
         # stop if not learning anymore
