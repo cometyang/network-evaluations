@@ -216,10 +216,8 @@ def stupid_map_wrapper(parameters):
 def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, patchSize=29, outPatchSize=1):
     def relabel(image):
         id_list = np.unique(image)
-
         for index, id in enumerate(id_list):
             image[image==id] = index
-
         return image
 
     start_time = time.time()
@@ -229,7 +227,7 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
     else:
         pathPrefix = '/n/pfister_lab/vkaynig/'
 
-    img_search_string_membraneImages = pathPrefix + 'labels/membranes/' + purpose + '/*.tif'
+    img_search_string_membraneImages = pathPrefix + 'labels/membranes_fullContour/' + purpose + '/*.tif'
     img_search_string_labelImages = pathPrefix + 'labels/' + purpose + '/*.tif'
     img_search_string_grayImages = pathPrefix + 'images/' + purpose + '/*.tif'
 
@@ -278,7 +276,7 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
         mask_img = maskImages[:,:,img_index]
 
         if purpose=='train':
-            membrane_img = adjust_imprecise_boundaries(img, membrane_img, 10)
+            membrane_img = adjust_imprecise_boundaries(img, membrane_img, 0)
 
         #get rid of invalid image borders
         mask_img[:,-patchSize:] = 0

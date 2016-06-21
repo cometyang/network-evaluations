@@ -4,6 +4,7 @@
 from keras.models import Model, Sequential, model_from_json
 from keras.layers import Dense, Activation, Flatten, Input
 from keras.layers import Convolution2D, MaxPooling2D, UpSampling2D, merge, ZeroPadding2D, Dropout, Lambda
+from keras.layers.normalization import BatchNormalization
 from keras.callbacks import EarlyStopping
 from keras import backend as K
 from keras.optimizers import SGD
@@ -22,8 +23,8 @@ from theano.tensor.shared_randomstreams import RandomStreams
 
 rng = np.random.RandomState(7)
 
-train_samples = 20 
-val_samples = 10
+train_samples = 30 
+val_samples = 20
 learning_rate = 0.01
 momentum = 0.95
 doTrain = int(sys.argv[1])
@@ -31,14 +32,17 @@ doTrain = int(sys.argv[1])
 patchSize = 572 #140
 patchSize_out = 388 #132
 
-weight_decay = 0.0
+weight_decay = 0.
 weight_class_1 = 1.
 
-patience = 10
+patience = 100
+patience_reset = 100
+
+doBatchNormAll = True
 
 purpose = 'train'
 initialization = 'glorot_uniform'
-filename = 'unet_rand_dilated_membranes'
+filename = 'unet_batchNorm'
 print "filename: ", filename
 
 srng = RandomStreams(1234)
@@ -68,21 +72,29 @@ def unet_crossentropy_loss_sampled(y_true, y_pred):
     indPos = indPos[srng.permutation(n=n)]
     n = indNeg.shape[0]
     indNeg = indNeg[srng.permutation(n=n)]
-    # subset assuming each class has at least 100 samples present
-    indPos = indPos[:200]
-    indNeg = indNeg[:200]
+    # take equal number of samples depending on which class has less
+    n_samples = T.cast(T.min([T.sum(y_true), T.sum(1-y_true)]), dtype='int64')
+
+    n_samples = 200
+
+    indPos = indPos[:n_samples]
+    indNeg = indNeg[:n_samples]
     loss_vector = -T.mean(T.log(y_pred_clipped[indPos])) - T.mean(T.log(1-y_pred_clipped[indNeg]))
     average_loss = T.mean(loss_vector)
     return average_loss
 
-def unet_block_down(input, nb_filter, doPooling=True, doDropout=False):
+def unet_block_down(input, nb_filter, doPooling=True, doDropout=False, doBatchNorm=False):
     # first convolutional block consisting of 2 conv layers plus activation, then maxpool.
     # All are valid area, not same
     act1 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
                              init=initialization, activation='relu',  border_mode="valid", W_regularizer=l2(weight_decay))(input)
+    if doBatchNorm:
+        act1 = BatchNormalization(mode=0, axis=1)(act1)
+
     act2 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
                              init=initialization, activation='relu', border_mode="valid", W_regularizer=l2(weight_decay))(act1)
-    
+    if doBatchNorm:
+        act2 = BatchNormalization(mode=0, axis=1)(act2)
 
     if doDropout:
         act2 = Dropout(0.5)(act2)
@@ -102,7 +114,7 @@ def crop_layer(x, cs):
     return x[:,:,cropSize:-cropSize, cropSize:-cropSize]
 
 
-def unet_block_up(input, nb_filter, down_block_out):
+def unet_block_up(input, nb_filter, down_block_out, doBatchNorm=False):
     print "This is unet_block_up"
     print "input ", input._keras_shape
     # upsampling
@@ -132,9 +144,17 @@ def unet_block_up(input, nb_filter, down_block_out):
     # first one halves the feature channels
     act1 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
                              init=initialization, activation='relu', border_mode="valid", W_regularizer=l2(weight_decay))(merged)
+
+    if doBatchNorm:
+        act1 = BatchNormalization(mode=0, axis=1)(act1)
+
     print "conv1 ", act1._keras_shape
     act2 = Convolution2D(nb_filter=nb_filter, nb_row=3, nb_col=3, subsample=(1,1),
                              init=initialization, activation='relu', border_mode="valid", W_regularizer=l2(weight_decay))(act1)
+    if doBatchNorm:
+        act2 = BatchNormalization(mode=0, axis=1)(act2)
+
+
     print "conv2 ", act2._keras_shape
     
     return act2
@@ -148,47 +168,47 @@ if doTrain:
     print "== BLOCK 1 =="
     input = Input(shape=(1, patchSize, patchSize))
     print "input ", input._keras_shape
-    block1_act, block1_pool = unet_block_down(input=input, nb_filter=64)
+    block1_act, block1_pool = unet_block_down(input=input, nb_filter=64, doBatchNorm=doBatchNormAll)
     print "block1 act ", block1_act._keras_shape
     print "block1 ", block1_pool._keras_shape
 
     print "== BLOCK 2 =="
-    block2_act, block2_pool = unet_block_down(input=block1_pool, nb_filter=128)
+    block2_act, block2_pool = unet_block_down(input=block1_pool, nb_filter=128, doBatchNorm=doBatchNormAll)
     print "block2 ", block2_pool._keras_shape
 
     print "== BLOCK 3 =="
-    block3_act, block3_pool = unet_block_down(input=block2_pool, nb_filter=256)
+    block3_act, block3_pool = unet_block_down(input=block2_pool, nb_filter=256, doBatchNorm=doBatchNormAll)
     print "block3 ", block3_pool._keras_shape
 
     print "== BLOCK 4 =="
-    block4_act, block4_pool = unet_block_down(input=block3_pool, nb_filter=512, doDropout=True)
+    block4_act, block4_pool = unet_block_down(input=block3_pool, nb_filter=512, doDropout=True, doBatchNorm=doBatchNormAll)
     print "block4 ", block4_pool._keras_shape
 
     print "== BLOCK 5 =="
     print "no pooling"
-    block5_act, block5_pool = unet_block_down(input=block4_pool, nb_filter=1024, doDropout=True, doPooling=False)
+    block5_act, block5_pool = unet_block_down(input=block4_pool, nb_filter=1024, doDropout=True, doPooling=False, doBatchNorm=doBatchNormAll)
     print "block5 ", block5_pool._keras_shape
 
     print "=============="
     print
 
     print "== BLOCK 4 UP =="
-    block4_up = unet_block_up(input=block5_act, nb_filter=512, down_block_out=block4_act)
+    block4_up = unet_block_up(input=block5_act, nb_filter=512, down_block_out=block4_act, doBatchNorm=doBatchNormAll)
     print "block4 up", block4_up._keras_shape
     print
 
     print "== BLOCK 3 UP =="
-    block3_up = unet_block_up(input=block4_up, nb_filter=256, down_block_out=block3_act)
+    block3_up = unet_block_up(input=block4_up, nb_filter=256, down_block_out=block3_act, doBatchNorm=doBatchNormAll)
     print "block3 up", block3_up._keras_shape
     print
 
     print "== BLOCK 2 UP =="
-    block2_up = unet_block_up(input=block3_up, nb_filter=128, down_block_out=block2_act)
+    block2_up = unet_block_up(input=block3_up, nb_filter=128, down_block_out=block2_act, doBatchNorm=doBatchNormAll)
     print "block2 up", block2_up._keras_shape
 
     print
     print "== BLOCK 1 UP =="
-    block1_up = unet_block_up(input=block2_up, nb_filter=64, down_block_out=block1_act)
+    block1_up = unet_block_up(input=block2_up, nb_filter=64, down_block_out=block1_act, doBatchNorm=doBatchNormAll)
     print "block1 up", block1_up._keras_shape
 
     print "== 1x1 convolution =="
@@ -266,8 +286,14 @@ if doTrain:
             learning_rate *= 0.1
             print "now: ", learning_rate
             model.optimizer.lr.set_value(learning_rate)
-            patience = 10
+            patience = patience_reset
             patience_counter = 0
+
+            # reload best state seen so far
+            model = model_from_json(open(filename+'_best.json').read())
+            model.load_weights(filename+'_best_weights.h5')
+            model.compile(loss=unet_crossentropy_loss_sampled, optimizer=sgd)
+
         
         # stop if not learning anymore
         if learning_rate < 1e-7:
