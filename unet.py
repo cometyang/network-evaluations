@@ -280,6 +280,7 @@ else:
     file_search_string = network_file_path + '*.json'
     files = sorted( glob.glob( file_search_string ) )
     pathPrefix = '/media/vkaynig/Data1/all_data/testing/AC4_small/'
+    #pathPrefix = '/media/vkaynig/Data1/all_data/testing/AC4/'
 
     for file_index in xrange(np.shape(files)[0]):
         print files[file_index]
