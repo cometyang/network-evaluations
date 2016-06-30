@@ -253,9 +253,9 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
     else:
         pathPrefix = '/n/pfister_lab/vkaynig/'
 
-    img_search_string_membraneImages = pathPrefix + 'labels/membranes_fullContour/' + purpose + '/*.tif'
-    img_search_string_labelImages = pathPrefix + 'labels/' + purpose + '/*.tif'
-    img_search_string_grayImages = pathPrefix + 'images/' + purpose + '/*.tif'
+    img_search_string_membraneImages = pathPrefix + 'labels/membranes_fullContour/' + purpose + '/train*.tif'
+    img_search_string_labelImages = pathPrefix + 'labels/' + purpose + '/train*.tif'
+    img_search_string_grayImages = pathPrefix + 'images/' + purpose + '/train*.tif'
 
     img_files_gray = sorted( glob.glob( img_search_string_grayImages ) )
     img_files_membrane = sorted( glob.glob( img_search_string_membraneImages ) )
@@ -296,13 +296,14 @@ def generate_experiment_data_patch_prediction(purpose='train', nsamples=1000, pa
             labelImages[:,:,img_index] = label_img
             
     for img_index in xrange(np.shape(img_files_gray)[0]):
+        #print img_files_gray[read_order[img_index]]
         img = grayImages[:,:,img_index]        
         label_img = labelImages[:,:,img_index]
         membrane_img = membraneImages[:,:,img_index]
         mask_img = maskImages[:,:,img_index]
 
         if purpose=='train':
-            membrane_img = adjust_imprecise_boundaries(img, membrane_img, 0)
+           membrane_img = adjust_imprecise_boundaries(img, membrane_img, 1)
 
         #get rid of invalid image borders
         mask_img[:,-patchSize:] = 0
@@ -539,7 +540,18 @@ def generate_experiment_data_patch_prediction_layers(purpose='train', nsamples=1
     return data_set
 
 if __name__=="__main__":
-    test = generate_experiment_data_patch_prediction_layers(purpose='validate', nsamples=2, patchSize=65, outPatchSize=65, nr_layers=3)
+    import uuid
+
+    test = generate_experiment_data_patch_prediction(purpose='train', nsamples=30, patchSize=572, outPatchSize=388)
+    dir_path = './training_patches/'
+    
+    for i in xrange(30):
+        unique_filename = str(uuid.uuid4())
+        img = np.reshape(test[1][i],(388,388))
+        img_gray = np.reshape(test[0][i],(572,572))
+        mahotas.imsave(dir_path+unique_filename+'.tif', np.uint8(img*255))
+        mahotas.imsave(dir_path+unique_filename+'_gray.tif', np.uint8((img_gray+0.5)*255))
+        
 
     #data_val = generate_experiment_data_supervised(purpose='validate', nsamples=10000, patchSize=65, balanceRate=0.5)
     #data = generate_experiment_data_patch_prediction(purpose='validate', nsamples=2, patchSize=315, outPatchSize=215)

@@ -25,7 +25,7 @@ rng = np.random.RandomState(7)
 
 train_samples = 30 
 val_samples = 20
-learning_rate = 0.01
+learning_rate = 0.001
 momentum = 0.95
 doTrain = int(sys.argv[1])
 
@@ -38,11 +38,12 @@ weight_class_1 = 1.
 patience = 100
 patience_reset = 100
 
-doBatchNormAll = True
+doBatchNormAll = False
+doFineTune = True
 
 purpose = 'train'
 initialization = 'glorot_uniform'
-filename = 'unet_batchNorm'
+filename = 'unet_sampling_best_fineTuned'
 print "filename: ", filename
 
 srng = RandomStreams(1234)
@@ -74,8 +75,6 @@ def unet_crossentropy_loss_sampled(y_true, y_pred):
     indNeg = indNeg[srng.permutation(n=n)]
     # take equal number of samples depending on which class has less
     n_samples = T.cast(T.min([T.sum(y_true), T.sum(1-y_true)]), dtype='int64')
-
-    n_samples = 200
 
     indPos = indPos[:n_samples]
     indNeg = indNeg[:n_samples]
@@ -219,6 +218,11 @@ if doTrain:
     print "output flat ", output_flat._keras_shape
     model = Model(input=input, output=output_flat)
     #model = Model(input=input, output=block1_act)
+
+    if doFineTune:
+        model = model_from_json(open('unet_sampling_best.json').read())
+        model.load_weights('unet_sampling_best_weights.h5')
+
     sgd = SGD(lr=learning_rate, decay=0, momentum=momentum, nesterov=False)
     #model.compile(loss='mse', optimizer=sgd)
     model.compile(loss=unet_crossentropy_loss_sampled, optimizer=sgd)
@@ -305,7 +309,8 @@ else:
     network_file_path = 'to_evaluate/'
     file_search_string = network_file_path + '*.json'
     files = sorted( glob.glob( file_search_string ) )
-    pathPrefix = '/media/vkaynig/Data1/all_data/testing/AC4_small/'
+    #pathPrefix = '/media/vkaynig/Data1/all_data/testing/AC4_small/'
+    pathPrefix = '/media/vkaynig/Data1/all_data/testing/left_cylinder_test/'
     #pathPrefix = '/media/vkaynig/Data1/all_data/testing/AC4/'
 
     for file_index in xrange(np.shape(files)[0]):
